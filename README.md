@@ -1,0 +1,1 @@
+* Shader "Custom/Fur 20Layer" - 20 pass fur shader, has bug on shadow receiving.
