@@ -33,6 +33,7 @@ Material:
     - _FurOffset: 0
     - _FurPow: 1
     - _Glossiness: 0.5
+    - _Layer: 20
     - _Metallic: 0
     - _Occlusion: 0.8
     - _Smoothness: 0

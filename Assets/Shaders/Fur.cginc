@@ -2,7 +2,7 @@
 #define FUR_INCLUDED
 
 #ifndef FUR_OFFSET
-#define FUR_OFFSET _FurOffset
+#define FUR_OFFSET 0.0
 #endif
 
 #define UNITY_BRDF_PBS Fabric_BRDF_PBS
@@ -22,52 +22,116 @@ half4 _Color;
 half _Smoothness;
 half _Metallic;
 half _FurLength;
-half _FurOffset;
 half4 _Gravity;
 half4 _Wind;
 half _Occlusion;
+int _Layer;
 
 struct appdata {
     float4 vertex    : POSITION;
     float3 normal    : NORMAL;
     float4 tangent   : TANGENT;
     float2 texcoord0 : TEXCOORD0;
-    float2 texcoord1 : TEXCOORD1;
 };
 
 struct v2f {
     float4 pos      : SV_POSITION;
     float4 uv       : TEXCOORD0;
-    float3 normal   : TEXCOORD1;
+    float4 normal   : TEXCOORD1; // [ 3:normal | 1:offset ]
     float4 worldPos : TEXCOORD2;
     float3 viewDir  : TEXCOORD3;
-    UNITY_SHADOW_COORDS(4)
-    UNITY_FOG_COORDS(5)
+    UNITY_FOG_COORDS(4)
+    #ifdef SHADOWS_SCREEN
+    UNITY_SHADOW_COORDS(5) // _ShadowCoord
+    #endif
 };
 
-float3 Displacement (float3 vertex, float3 normal, float2 uv) {
-    float3 gravity = mul((float3x3)unity_WorldToObject, _Gravity.xyz) * FUR_OFFSET;
-    float3 wind = mul((float3x3)unity_WorldToObject, _Wind.xyz); 
+float3 Displacement (float3 worldPos, float3 worldNormal, float2 uv, float offset) {
+    float3 gravity = _Gravity.xyz * offset;
+    float3 wind = _Wind.xyz;
     wind *= 1 + sin(_Time.x * _Wind.w + uv.x * 6.2831853h) * sin(_Time.x * _Wind.w + uv.y * 6.2831853h);
-    return vertex + normal * (_FurLength * FUR_OFFSET) + (gravity + wind) * FUR_OFFSET;
+    return worldPos + worldNormal * (_FurLength * offset) + (gravity + wind) * offset;
+}
+
+v2f VertexOutput (v2f o, float4 worldPos, float3 worldNormal) {
+    #if defined(PASS_CUBE_SHADOWCASTER)
+    // Cube map shadow caster pass: Transfer the shadow vector.
+    o.pos = UnityWorldToClipPos(worldPos);
+    o.shadow = wpos - _LightPositionRange.xyz;
+
+    #elif defined(UNITY_PASS_SHADOWCASTER)
+    if (unity_LightShadowBias.z != 0.0) {
+        float3 wLight = normalize(UnityWorldSpaceLightDir(worldPos.xyz));
+        float shadowCos = dot(worldNormal, wLight);
+        float normalBias = unity_LightShadowBias.z * sqrt(1 - shadowCos * shadowCos);
+        worldPos.xyz -= worldNormal * normalBias;
+    }
+    float4 position = mul(UNITY_MATRIX_VP, worldPos);
+    o.pos = UnityApplyLinearShadowBias(position);
+
+    #else
+    // color shader
+    o.pos = UnityWorldToClipPos(worldPos);
+    #endif
+
+    return o;
 }
 
 v2f vert (appdata v) {
     v2f o;
     UNITY_INITIALIZE_OUTPUT(v2f, o);
 
-    float3 vertex = Displacement(v.vertex.xyz, v.normal, v.texcoord0.xy);
-    o.pos = UnityObjectToClipPos(vertex);
+    float4 worldPos = mul(unity_ObjectToWorld, v.vertex);
+    float3 worldNormal = UnityObjectToWorldNormal(v.normal);
+    #ifndef GEOMETRY_SHADER
+    worldPos.xyz = Displacement (worldPos.xyz, worldNormal, v.texcoord0.xy, FUR_OFFSET);
+    #endif
+
     o.uv.xy = TRANSFORM_TEX(v.texcoord0, _MainTex);
     o.uv.zw = TRANSFORM_TEX(v.texcoord0, _MaskTex);
+    o.normal.xyz = worldNormal;
+    o.normal.w = FUR_OFFSET;
+    o.worldPos = worldPos;
+    o.viewDir = _WorldSpaceCameraPos - worldPos;
 
-    o.normal = UnityObjectToWorldNormal(v.normal);
-    o.worldPos = mul(unity_ObjectToWorld, v.vertex);
-    o.viewDir = _WorldSpaceCameraPos - o.worldPos.xyz;
+    o = VertexOutput (o, worldPos, worldNormal); // setup shadow caster data if need
 
-    UNITY_TRANSFER_LIGHTING(o, v.texcoord1);
+    #ifdef SHADOWS_SCREEN
+    TRANSFER_SHADOW(o);
+    #endif
     UNITY_TRANSFER_FOG(o, o.pos);
     return o;
+}
+
+[maxvertexcount(42)]
+void geom (triangle v2f input[3], uint pid : SV_PrimitiveID, inout TriangleStream<v2f> outStream) {
+    v2f v0 = input[0];
+    v2f v1 = input[1];
+    v2f v2 = input[2];
+
+    v0.pos = UnityWorldToClipPos(v0.worldPos.xyz);
+    v1.pos = UnityWorldToClipPos(v1.worldPos.xyz);
+    v2.pos = UnityWorldToClipPos(v2.worldPos.xyz);
+    outStream.Append(v0);
+    outStream.Append(v1);
+    outStream.Append(v2);
+    outStream.RestartStrip();
+
+    int layer = min(14, _Layer);
+    float offset_per_layer = 1.0 / layer;
+    float offset = 0;
+    for(int i = 1; i < layer; i++) {
+        offset += offset_per_layer;
+        v0.pos = UnityWorldToClipPos(v0.worldPos.xyz + v0.normal.xyz * (_FurLength * offset));
+        v1.pos = UnityWorldToClipPos(v1.worldPos.xyz + v1.normal.xyz * (_FurLength * offset));
+        v2.pos = UnityWorldToClipPos(v2.worldPos.xyz + v2.normal.xyz * (_FurLength * offset));
+        v0.normal.w = v1.normal.w = v2.normal.w = offset;
+        
+        outStream.Append(v0);
+        outStream.Append(v1);
+        outStream.Append(v2);
+        outStream.RestartStrip();
+    }
 }
 
 UnityGI FragmentGI (float3 worldPos, float3 worldNormal, float3 viewDir, half occlusion, half smoothness, half3 specColor, half3 ambient, half atten, UnityLight light) {
@@ -121,17 +185,13 @@ UnityIndirect DummyIndirect () {
     return i;
 }
 
-half4 frag (v2f i) : SV_Target {
-    half4 color = tex2D(_MainTex, i.uv.xy);
-    half4 mask = tex2D(_MaskTex, i.uv.zw);
-    clip(mask.r * color.a - FUR_OFFSET);
-
+half4 FragmentBase (v2f i, half offset, half4 color) {
     half3 worldPos = i.worldPos;
-    half3 worldNormal = normalize(i.normal);
+    half3 worldNormal = normalize(i.normal.xyz);
     half3 viewDir = normalize(i.viewDir);
 
     // lighting
-    half occlusion = lerp(1 - _Occlusion, 1, FUR_OFFSET);
+    half occlusion = lerp(1 - _Occlusion, 1, offset);
     half smoothness = _Smoothness;
     half metallic = _Metallic;
     half3 ambient = 0; // TODO: light probe
@@ -166,53 +226,17 @@ half4 frag (v2f i) : SV_Target {
     return c;
 }
 
-struct appdata_shadow {
-    float4 vertex    : POSITION;
-    float3 normal    : NORMAL;
-    float2 texcoord  : TEXCOORD0;
-};
-
-struct v2f_shadow {
-    V2F_SHADOW_CASTER;
-    float4 uv        : TEXCOORD1;
-    #if defined (_ALPHATESTMODE_DITHER4) || defined (_ALPHATESTMODE_DITHER8)
-    float4 screenPos : TEXCOORD2;
-    #endif
-    #if defined (_ALPHATESTMODE_HASHED)
-    float4 objPos    : TEXCOORD3;
-    #endif
-    UNITY_VERTEX_INPUT_INSTANCE_ID
-};
-
-v2f_shadow vert_shadow(appdata_shadow v) {
-    v2f_shadow o;
-    UNITY_INITIALIZE_OUTPUT(v2f_shadow, o);
-    UNITY_SETUP_INSTANCE_ID(v);
-    UNITY_TRANSFER_INSTANCE_ID(v, o);
-
-    v.vertex.xyz = Displacement(v.vertex.xyz, v.normal, v.texcoord.xy);
-    o.uv.xy = TRANSFORM_TEX(v.texcoord, _MainTex);
-    o.uv.zw = TRANSFORM_TEX(v.texcoord, _MaskTex);
-
-    TRANSFER_SHADOW_CASTER(o)
-
-    #if defined (_ALPHATESTMODE_DITHER4) || defined (_ALPHATESTMODE_DITHER8)
-    o.screenPos = ComputeScreenPos(o.pos);
-    #endif
-    #if defined (_ALPHATESTMODE_HASHED)
-    o.objPos = v.vertex;
-    #endif
-    return o;
-}
-
-half4 frag_shadow(v2f_shadow i) : SV_Target {
-    UNITY_SETUP_INSTANCE_ID(i);
-
+half4 frag (v2f i) : SV_Target {
+    half offset = i.normal.w;
     half4 color = tex2D(_MainTex, i.uv.xy);
     half4 mask = tex2D(_MaskTex, i.uv.zw);
-    clip(mask.r * color.a - FUR_OFFSET);
+    clip(mask.r * color.a - offset);
 
+    #ifdef UNITY_PASS_SHADOWCASTER
     SHADOW_CASTER_FRAGMENT(i)
+    #else
+    return FragmentBase(i, offset, color);
+    #endif
 }
 
 #endif // FUR_INCLUDED
