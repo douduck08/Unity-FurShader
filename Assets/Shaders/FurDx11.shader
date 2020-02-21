@@ -20,30 +20,55 @@
 
         Pass {
             Tags { "LightMode" = "ForwardBase" }
+            Blend One Zero
+            ZWrite On
+            ZTest LEqual
+
             CGPROGRAM
             #pragma vertex vert
-            // #pragma geometry geom
+            #pragma geometry geom
             #pragma fragment frag
             #pragma target 4.0
             #pragma multi_compile_fwdbase
             #pragma multi_compile_fog
-            // #pragma skip_variants SHADOWS_SCREEN
 
-            // #define GEOMETRY_SHADER
+            #define GEOMETRY_SHADER
+            #include "Fur.cginc"
+            ENDCG
+        }
+
+        Pass {
+            Tags { "LightMode" = "ForwardAdd" }
+            Blend One One
+            ZWrite Off
+            ZTest LEqual
+
+            CGPROGRAM
+            #pragma vertex vert
+            #pragma geometry geom
+            #pragma fragment frag
+            #pragma target 4.0
+            #pragma multi_compile_fwdadd_fullshadows
+            #pragma multi_compile_fog
+
+            #define GEOMETRY_SHADER
             #include "Fur.cginc"
             ENDCG
         }
 
         Pass {
             Tags { "LightMode"="ShadowCaster" }
+            ZWrite On
+            ZTest LEqual
+
             CGPROGRAM
             #pragma target 4.0
             #pragma vertex vert
-            // #pragma geometry Geometry
+            #pragma geometry geom
             #pragma fragment frag
             #pragma multi_compile_shadowcaster noshadowmask nodynlightmap nodirlightmap nolightmap
 
-            #define UNITY_PASS_SHADOWCASTER
+            #define GEOMETRY_SHADER
             #include "Fur.cginc"
             ENDCG
         }

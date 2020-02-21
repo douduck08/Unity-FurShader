@@ -24,7 +24,7 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _MaskTex:
-        m_Texture: {fileID: 2800000, guid: d5fb036e5943e8940aa9a380acfc48be, type: 3}
+        m_Texture: {fileID: 2800000, guid: d7bbbc52e43c3d44f92546c1335a2d23, type: 3}
         m_Scale: {x: 20, y: 20}
         m_Offset: {x: 0, y: 0}
     m_Floats:
@@ -33,9 +33,9 @@ Material:
     - _FurOffset: 0
     - _FurPow: 1
     - _Glossiness: 0.5
-    - _Layer: 1
+    - _Layer: 14
     - _Metallic: 0
-    - _Occlusion: 0
+    - _Occlusion: 0.8
     - _Smoothness: 0
     m_Colors:
     - _Color: {r: 0.9811321, g: 0.8670854, b: 0.7728729, a: 1}

@@ -7,3 +7,4 @@ Current Features / Properties
 
 Shaders
 * Shader `Custom/Fur(20 Layer)` - 20 pass cut-off fur shader, not supported shadow, not supported multi-lighting.
+* Shader `Custom/Fur(DX11)` - 1 pass cut-off fur shader, supported shadow, supported multi-lighting. Need geometry shader.

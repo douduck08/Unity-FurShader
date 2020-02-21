@@ -34,9 +34,9 @@ Material:
     - _FurPow: 1
     - _Glossiness: 0.5
     - _Metallic: 0
-    - _Occlusion: 0.534
+    - _Occlusion: 0.8
     - _Smoothness: 0
     m_Colors:
     - _Color: {r: 0.7075472, g: 0.49340466, b: 0.2770114, a: 1}
     - _Gravity: {r: 0, g: -0.1, b: 0, a: 0}
-    - _Wind: {r: 0, g: 0, b: 0, a: 0}
+    - _Wind: {r: 0, g: -0.02, b: 0, a: 30}

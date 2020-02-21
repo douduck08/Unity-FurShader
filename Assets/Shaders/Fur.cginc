@@ -5,12 +5,13 @@
 #define FUR_OFFSET 0.0
 #endif
 
-#define UNITY_BRDF_PBS Fabric_BRDF_PBS
+// #define UNITY_BRDF_PBS Fabric_BRDF_PBS
 
 #include "UnityCG.cginc"
 #include "AutoLight.cginc"
 #include "FabricBRDF.cginc"
 #include "UnityGlobalIllumination.cginc"
+#include "UnityPBSLighting.cginc"
 
 sampler2D _MainTex;
 float4 _MainTex_ST;
@@ -40,10 +41,14 @@ struct v2f {
     float4 normal   : TEXCOORD1; // [ 3:normal | 1:offset ]
     float4 worldPos : TEXCOORD2;
     float3 viewDir  : TEXCOORD3;
-    UNITY_FOG_COORDS(4)
-    #ifdef SHADOWS_SCREEN
-    UNITY_SHADOW_COORDS(5) // _ShadowCoord
+    #if defined(SHADOWS_CUBE)
+    float3 vec : TEXCOORD4; // light vec
     #endif
+    UNITY_FOG_COORDS(5)
+    #ifdef SHADOWS_SCREEN
+    UNITY_SHADOW_COORDS(6) // _ShadowCoord
+    #endif
+
 };
 
 float3 Displacement (float3 worldPos, float3 worldNormal, float2 uv, float offset) {
@@ -54,12 +59,12 @@ float3 Displacement (float3 worldPos, float3 worldNormal, float2 uv, float offse
 }
 
 v2f VertexOutput (v2f o, float4 worldPos, float3 worldNormal) {
-    #if defined(PASS_CUBE_SHADOWCASTER)
+    #if defined(SHADOWS_CUBE)
     // Cube map shadow caster pass: Transfer the shadow vector.
     o.pos = UnityWorldToClipPos(worldPos);
-    o.shadow = wpos - _LightPositionRange.xyz;
+    o.vec = worldPos.xyz - _LightPositionRange.xyz;
 
-    #elif defined(UNITY_PASS_SHADOWCASTER)
+    #elif defined(SHADOWS_DEPTH)
     if (unity_LightShadowBias.z != 0.0) {
         float3 wLight = normalize(UnityWorldSpaceLightDir(worldPos.xyz));
         float shadowCos = dot(worldNormal, wLight);
@@ -83,8 +88,10 @@ v2f vert (appdata v) {
 
     float4 worldPos = mul(unity_ObjectToWorld, v.vertex);
     float3 worldNormal = UnityObjectToWorldNormal(v.normal);
+
     #ifndef GEOMETRY_SHADER
     worldPos.xyz = Displacement (worldPos.xyz, worldNormal, v.texcoord0.xy, FUR_OFFSET);
+    o = VertexOutput (o, worldPos, worldNormal); // setup shadow caster data if need
     #endif
 
     o.uv.xy = TRANSFORM_TEX(v.texcoord0, _MainTex);
@@ -93,8 +100,6 @@ v2f vert (appdata v) {
     o.normal.w = FUR_OFFSET;
     o.worldPos = worldPos;
     o.viewDir = _WorldSpaceCameraPos - worldPos;
-
-    o = VertexOutput (o, worldPos, worldNormal); // setup shadow caster data if need
 
     #ifdef SHADOWS_SCREEN
     TRANSFER_SHADOW(o);
@@ -109,28 +114,43 @@ void geom (triangle v2f input[3], uint pid : SV_PrimitiveID, inout TriangleStrea
     v2f v1 = input[1];
     v2f v2 = input[2];
 
-    v0.pos = UnityWorldToClipPos(v0.worldPos.xyz);
-    v1.pos = UnityWorldToClipPos(v1.worldPos.xyz);
-    v2.pos = UnityWorldToClipPos(v2.worldPos.xyz);
-    outStream.Append(v0);
-    outStream.Append(v1);
-    outStream.Append(v2);
-    outStream.RestartStrip();
+    float3 worldPos0 = v0.worldPos;
+    float3 worldPos1 = v1.worldPos;
+    float3 worldPos2 = v2.worldPos;
 
     int layer = min(14, _Layer);
     float offset_per_layer = 1.0 / layer;
     float offset = 0;
-    for(int i = 1; i < layer; i++) {
-        offset += offset_per_layer;
-        v0.pos = UnityWorldToClipPos(v0.worldPos.xyz + v0.normal.xyz * (_FurLength * offset));
-        v1.pos = UnityWorldToClipPos(v1.worldPos.xyz + v1.normal.xyz * (_FurLength * offset));
-        v2.pos = UnityWorldToClipPos(v2.worldPos.xyz + v2.normal.xyz * (_FurLength * offset));
-        v0.normal.w = v1.normal.w = v2.normal.w = offset;
+    for(int i = 0; i < layer; i++) {
+        v0.worldPos.xyz = Displacement (worldPos0, v0.normal, v0.uv.xy, offset);
+        v0 = VertexOutput (v0, v0.worldPos, v0.normal); // setup shadow caster data if need
+        v0.normal.w = offset;
+        #ifdef SHADOWS_SCREEN
+        TRANSFER_SHADOW(v0);
+        #endif
+        UNITY_TRANSFER_FOG(v0, v0.pos);
+
+        v1.worldPos.xyz = Displacement (worldPos1, v1.normal, v1.uv.xy, offset);
+        v1 = VertexOutput (v1, v1.worldPos, v1.normal); // setup shadow caster data if need
+        v1.normal.w = offset;
+        #ifdef SHADOWS_SCREEN
+        TRANSFER_SHADOW(v1);
+        #endif
+        UNITY_TRANSFER_FOG(v1, v1.pos);
+        
+        v2.worldPos.xyz = Displacement (worldPos2, v2.normal, v2.uv.xy, offset);
+        v2 = VertexOutput (v2, v2.worldPos, v2.normal); // setup shadow caster data if need
+        v2.normal.w = offset;
+        #ifdef SHADOWS_SCREEN
+        TRANSFER_SHADOW(v2);
+        #endif
+        UNITY_TRANSFER_FOG(v2, v2.pos);
         
         outStream.Append(v0);
         outStream.Append(v1);
         outStream.Append(v2);
         outStream.RestartStrip();
+        offset += offset_per_layer;
     }
 }
 
@@ -230,7 +250,7 @@ half4 frag (v2f i) : SV_Target {
     half offset = i.normal.w;
     half4 color = tex2D(_MainTex, i.uv.xy);
     half4 mask = tex2D(_MaskTex, i.uv.zw);
-    clip(mask.r * color.a - offset);
+    clip(mask.r * color.a - offset - 1.0e-6h);
 
     #ifdef UNITY_PASS_SHADOWCASTER
     SHADOW_CASTER_FRAGMENT(i)
