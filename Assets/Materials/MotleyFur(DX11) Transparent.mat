@@ -7,8 +7,8 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: MotleyFur(DX11)
-  m_Shader: {fileID: 4800000, guid: af6ba861f2d894e4abbe08501604c400, type: 3}
+  m_Name: MotleyFur(DX11) Transparent
+  m_Shader: {fileID: 4800000, guid: 796761e4a5390cf46b71689505889a7c, type: 3}
   m_ShaderKeywords: 
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
@@ -33,7 +33,7 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Floats:
     - _FabricScatterScale: 5
-    - _FurLength: 0.2
+    - _FurLength: 0.3
     - _FurOffset: 0
     - _FurPow: 1
     - _Glossiness: 0.5
@@ -43,5 +43,5 @@ Material:
     - _Smoothness: 0
     m_Colors:
     - _Color: {r: 0.9811321, g: 0.8670854, b: 0.7728729, a: 1}
-    - _Gravity: {r: 0, g: -0.1, b: 0, a: 0}
+    - _Gravity: {r: 0, g: -0.2, b: 0, a: 0}
     - _Wind: {r: 0, g: -0.02, b: 0, a: 30}

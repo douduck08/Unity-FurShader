@@ -1,4 +1,4 @@
-﻿Shader "Custom/Fur(DX11)" {
+﻿Shader "Custom/Fur(DX11) Transparent" {
     Properties {
         _Color ("Color", Color) = (1,1,1,1)
         _MainTex ("Albedo", 2D) = "white" {}
@@ -15,13 +15,13 @@
         [HideInInspector] _FabricScatterScale("Fabric Scatter", Range(0,10)) = 5.0
     }
     SubShader {
-        Tags { "Queue"="AlphaTest" "RenderType"="TransparentCutout" }
-        Cull Off
+        Tags { "Queue"="Transparent" "RenderType"="Transparent" }
+        Cull Back
 
         Pass {
             Tags { "LightMode" = "ForwardBase" }
-            Blend One Zero
-            ZWrite On
+            Blend SrcAlpha OneMinusSrcAlpha
+            ZWrite Off
             ZTest LEqual
 
             CGPROGRAM
@@ -32,6 +32,7 @@
             #pragma multi_compile_fwdbase
             #pragma multi_compile_fog
 
+            #define TRANSPARENT
             #define GEOMETRY_SHADER
             #include "Fur.cginc"
             ENDCG
@@ -51,28 +52,11 @@
             #pragma multi_compile_fwdadd_fullshadows
             #pragma multi_compile_fog
 
+            #define TRANSPARENT
             #define GEOMETRY_SHADER
             #include "Fur.cginc"
             ENDCG
         }
-
-        Pass {
-            Tags { "LightMode"="ShadowCaster" }
-            ZWrite On
-            ZTest LEqual
-
-            CGPROGRAM
-            #pragma target 4.0
-            #pragma vertex vert
-            #pragma geometry geom
-            #pragma fragment frag
-            #pragma multi_compile_shadowcaster noshadowmask nodynlightmap nodirlightmap nolightmap
-
-            #define GEOMETRY_SHADER
-            #include "Fur.cginc"
-            ENDCG
-        }
-        
     }
-    FallBack "Diffuse"
+    FallBack Off
 }

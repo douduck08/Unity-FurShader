@@ -5,17 +5,17 @@
 #define FUR_OFFSET 0.0
 #endif
 
+// FIXME: Fabric BRDF has bugs in linear color space
 // #define UNITY_BRDF_PBS Fabric_BRDF_PBS
+// #include "FabricBRDF.cginc"
 
 #include "UnityCG.cginc"
 #include "AutoLight.cginc"
-#include "FabricBRDF.cginc"
 #include "UnityGlobalIllumination.cginc"
 #include "UnityPBSLighting.cginc"
 
 sampler2D _MainTex;
 float4 _MainTex_ST;
-
 sampler2D _MaskTex;
 float4 _MaskTex_ST;
 
@@ -41,21 +41,23 @@ struct v2f {
     float4 normal   : TEXCOORD1; // [ 3:normal | 1:offset ]
     float4 worldPos : TEXCOORD2;
     float3 viewDir  : TEXCOORD3;
+    half3 ambient   : TEXCOORD4;
     #if defined(SHADOWS_CUBE)
-    float3 vec : TEXCOORD4; // light vec
+    float3 vec : TEXCOORD5; // light vec
     #endif
-    UNITY_FOG_COORDS(5)
+    UNITY_FOG_COORDS(6)
     #ifdef SHADOWS_SCREEN
-    UNITY_SHADOW_COORDS(6) // _ShadowCoord
+    UNITY_SHADOW_COORDS(7) // _ShadowCoord
     #endif
 
 };
 
 float3 Displacement (float3 worldPos, float3 worldNormal, float2 uv, float offset) {
-    float3 gravity = _Gravity.xyz * offset;
-    float3 wind = _Wind.xyz;
-    wind *= 1 + sin(_Time.x * _Wind.w + uv.x * 6.2831853h) * sin(_Time.x * _Wind.w + uv.y * 6.2831853h);
-    return worldPos + worldNormal * (_FurLength * offset) + (gravity + wind) * offset;
+    float offset2 = offset * offset;
+    // float offset3 = offset * offset2;
+    float3 gravity = _Gravity.xyz;
+    float3 wind = _Wind.xyz * (1 + sin(_Time.x * _Wind.w + uv.x * 6.2831853h) * sin(_Time.x * _Wind.w + uv.y * 6.2831853h));
+    return worldPos + worldNormal * (_FurLength * offset) + (gravity * offset2 + wind * offset) ;
 }
 
 v2f VertexOutput (v2f o, float4 worldPos, float3 worldNormal) {
@@ -101,6 +103,10 @@ v2f vert (appdata v) {
     o.worldPos = worldPos;
     o.viewDir = _WorldSpaceCameraPos - worldPos;
 
+    #ifdef UNITY_SHOULD_SAMPLE_SH
+    o.ambient.rgb = ShadeSHPerVertex (worldNormal, 0);
+    #endif
+
     #ifdef SHADOWS_SCREEN
     TRANSFER_SHADOW(o);
     #endif
@@ -108,7 +114,7 @@ v2f vert (appdata v) {
     return o;
 }
 
-[maxvertexcount(42)]
+[maxvertexcount(39)]
 void geom (triangle v2f input[3], uint pid : SV_PrimitiveID, inout TriangleStream<v2f> outStream) {
     v2f v0 = input[0];
     v2f v1 = input[1];
@@ -118,8 +124,8 @@ void geom (triangle v2f input[3], uint pid : SV_PrimitiveID, inout TriangleStrea
     float3 worldPos1 = v1.worldPos;
     float3 worldPos2 = v2.worldPos;
 
-    int layer = min(14, _Layer);
-    float offset_per_layer = 1.0 / layer;
+    int layer = min(13, _Layer);
+    float offset_per_layer = 1.0 / (layer - 1);
     float offset = 0;
     for(int i = 0; i < layer; i++) {
         v0.worldPos.xyz = Displacement (worldPos0, v0.normal, v0.uv.xy, offset);
@@ -205,7 +211,7 @@ UnityIndirect DummyIndirect () {
     return i;
 }
 
-half4 FragmentBase (v2f i, half offset, half4 color) {
+half4 FragmentPBSInternal (v2f i, half offset, half4 color) {
     half3 worldPos = i.worldPos;
     half3 worldNormal = normalize(i.normal.xyz);
     half3 viewDir = normalize(i.viewDir);
@@ -214,7 +220,7 @@ half4 FragmentBase (v2f i, half offset, half4 color) {
     half occlusion = lerp(1 - _Occlusion, 1, offset);
     half smoothness = _Smoothness;
     half metallic = _Metallic;
-    half3 ambient = 0; // TODO: light probe
+    half3 ambient = i.ambient;
 
     half3 diffColor, specColor;
     half oneMinusReflectivity;
@@ -249,13 +255,21 @@ half4 FragmentBase (v2f i, half offset, half4 color) {
 half4 frag (v2f i) : SV_Target {
     half offset = i.normal.w;
     half4 color = tex2D(_MainTex, i.uv.xy);
-    half4 mask = tex2D(_MaskTex, i.uv.zw);
-    clip(mask.r * color.a - offset - 1.0e-6h);
+    half mask = tex2D(_MaskTex, i.uv.zw).r;
+    half alpha = mask * color.a - offset;
+
+    #ifndef TRANSPARENT
+    clip(alpha - 1.0e-6h);
+    #endif
 
     #ifdef UNITY_PASS_SHADOWCASTER
     SHADOW_CASTER_FRAGMENT(i)
     #else
-    return FragmentBase(i, offset, color);
+    color = FragmentPBSInternal(i, offset, color);
+    #ifdef TRANSPARENT
+    color.a = saturate(alpha);
+    #endif
+    return color;
     #endif
 }
 
