@@ -8,7 +8,7 @@ Material:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: ClotFur
-  m_Shader: {fileID: 4800000, guid: af1456a6405f47c408a5378dd21d399e, type: 3}
+  m_Shader: {fileID: 4800000, guid: 6181b9cc1727f464fb2512159f2e2029, type: 3}
   m_ShaderKeywords: 
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
