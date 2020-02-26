@@ -7,8 +7,8 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: ToonFur
-  m_Shader: {fileID: 4800000, guid: 2d70278357d7a0c44ba87d6b62ce15f1, type: 3}
+  m_Name: StandardFur(Cutoff)
+  m_Shader: {fileID: 4800000, guid: 6c9cdcc467833db44bb1298145bc5655, type: 3}
   m_ShaderKeywords: 
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
@@ -20,37 +20,21 @@ Material:
     serializedVersion: 3
     m_TexEnvs:
     - _MainTex:
-        m_Texture: {fileID: 0}
+        m_Texture: {fileID: 2800000, guid: ec2fae5d1aa1f744480c702b272fdf5e, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _MaskTex:
         m_Texture: {fileID: 2800000, guid: d5fb036e5943e8940aa9a380acfc48be, type: 3}
         m_Scale: {x: 30, y: 30}
         m_Offset: {x: 0, y: 0}
-    - _NoiseTex:
-        m_Texture: {fileID: 2800000, guid: 05a2b5bbef9270945993f59bd2722509, type: 3}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
     m_Floats:
     - _FabricScatterScale: 5
     - _FurLength: 0.1
-    - _FurOffset: 0
-    - _FurPow: 1
-    - _Glossiness: 0.5
-    - _Layer: 13
+    - _Layer: 10
     - _Metallic: 0
-    - _NoiseStrength: 1
-    - _Occlusion: 0.75
-    - _RimBoost: 0.5
-    - _RimPow: 2
+    - _Occlusion: 0.5
     - _Smoothness: 0
-    - _SpecBoost: 1.5
-    - _SpecPow: 2
-    - _Translucency: 0.5
     m_Colors:
     - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _Gravity: {r: 0, g: -0.05, b: 0, a: 0}
-    - _RimColor: {r: 0.5424528, g: 0.76062465, b: 1, a: 1}
-    - _SpecColor: {r: 1, g: 1, b: 1, a: 1}
-    - _TranslucencyColor: {r: 1, g: 1, b: 1, a: 1}
     - _Wind: {r: 0, g: -0.02, b: 0, a: 20}

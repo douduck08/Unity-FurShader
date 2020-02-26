@@ -6,12 +6,14 @@ Current Features / Properties
 * Occlusion
 
 Shaders
-* Shader `Custom/Fur(20 Layer)`
-  * 20 pass cut-off fur shader
+* Shader `Custom/StandardFur`
+  * 1 pass opaque
+  * 10 pass transparent
   * not support shadow
   * not support multi-lighting
-* Shader `Custom/Fur(DX11)`
-  * 1 pass cut-off fur shader
+* Shader `Custom/StandardFur(DX11)`
+  * 1 pass opaque
+  * 1 pass transparent
   * need geometry shader supported
   * support shadow
   * support multi-lighting
